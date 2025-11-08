@@ -43,7 +43,10 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 # Pre-defined configs
 ##
 from robot_lab.assets.unitree import UNITREE_G1_29DOF_CFG
+from robot_lab.assets.roboparty import ATOM01_CFG
 from robot_lab.tasks.manager_based.beyondmimic.mdp import MotionLoader
+
+import isaaclab.utils.string as string_utils
 
 
 @configclass
@@ -61,9 +64,9 @@ class ReplayMotionsSceneCfg(InteractiveSceneCfg):
     )
 
     # articulation
-    robot: ArticulationCfg = UNITREE_G1_29DOF_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-
-
+    # robot: ArticulationCfg = UNITREE_G1_29DOF_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = ATOM01_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     # Extract scene entities
     robot: Articulation = scene["robot"]
@@ -76,7 +79,18 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         sim.device,
     )
     time_steps = torch.zeros(scene.num_envs, dtype=torch.long, device=sim.device)
-
+    
+    retargeted_joint_names = motion.joint_names
+    lab_joint_names = robot.data.joint_names
+    retargeted_to_lab_mapping, _ = string_utils.resolve_matching_names(
+        keys=lab_joint_names,
+        list_of_strings= retargeted_joint_names,
+        preserve_order=True
+    )
+    motion.joint_pos = motion.joint_pos[:, retargeted_to_lab_mapping]
+    motion.joint_vel = motion.joint_vel[:, retargeted_to_lab_mapping]
+    
+    
     # Simulation loop
     while simulation_app.is_running():
         time_steps += 1
@@ -86,8 +100,13 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         root_states = robot.data.default_root_state.clone()
         root_states[:, :3] = motion.body_pos_w[time_steps][:, 0] + scene.env_origins[:, None, :]
         root_states[:, 3:7] = motion.body_quat_w[time_steps][:, 0]
+
         root_states[:, 7:10] = motion.body_lin_vel_w[time_steps][:, 0]
         root_states[:, 10:] = motion.body_ang_vel_w[time_steps][:, 0]
+        
+        # print("motion pos:", motion.body_pos_w[time_steps][:, 0])
+        # print("motion quat:", motion.body_quat_w[time_steps][:, 0])
+        # print("robot joint names:", robot.data.joint_names)
 
         robot.write_root_state_to_sim(root_states)
         robot.write_joint_state_to_sim(motion.joint_pos[time_steps], motion.joint_vel[time_steps])
@@ -95,8 +114,8 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         sim.render()  # We don't want physic (sim.step())
         scene.update(sim_dt)
 
-        pos_lookat = root_states[0, :3].cpu().numpy()
-        sim.set_camera_view(pos_lookat + np.array([2.0, 2.0, 0.5]), pos_lookat)
+        # pos_lookat = root_states[0, :3].cpu().numpy()
+        # sim.set_camera_view(pos_lookat + np.array([2.0, 2.0, 0.5]), pos_lookat)
 
 
 def main():

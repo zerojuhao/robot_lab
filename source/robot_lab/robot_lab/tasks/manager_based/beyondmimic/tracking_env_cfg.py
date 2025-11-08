@@ -119,13 +119,13 @@ class ObservationsCfg:
 
         # observation terms (order preserved)
         command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
-        motion_anchor_pos_b = ObsTerm(
-            func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.25, n_max=0.25)
-        )
+        # motion_anchor_pos_b = ObsTerm(
+        #     func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.25, n_max=0.25)
+        # )
         motion_anchor_ori_b = ObsTerm(
             func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5))
+        # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5))
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5))
@@ -134,7 +134,10 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
-
+            self.history_length = 1
+            
+    policy: PolicyCfg = PolicyCfg()
+    
     @configclass
     class CriticCfg(ObsGroup):
         command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
@@ -148,8 +151,10 @@ class ObservationsCfg:
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         actions = ObsTerm(func=mdp.last_action)
 
-    # observation groups
-    policy: PolicyCfg = PolicyCfg()
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+            self.history_length = 1
     critic: CriticCfg = CriticCfg()
 
 
@@ -252,41 +257,44 @@ class RewardsCfg:
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
                 body_names=[
-                    r"^(?!left_ankle_roll_link$)(?!right_ankle_roll_link$)(?!left_wrist_yaw_link$)(?!right_wrist_yaw_link$).+$"
+                    r"^(?!left_ankle_roll_link$)(?!right_ankle_roll_link$)(?!left_elbow_yaw_link$)(?!right_elbow_yaw_link$).+$"
                 ],
             ),
             "threshold": 1.0,
         },
     )
 
-
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    anchor_pos = DoneTerm(
-        func=mdp.bad_anchor_pos_z_only,
-        params={"command_name": "motion", "threshold": 0.25},
+    # anchor_pos = DoneTerm(
+    #     func=mdp.bad_anchor_pos_z_only,
+    #     params={"command_name": "motion", "threshold": 0.25},
+    # )
+    # anchor_ori = DoneTerm(
+    #     func=mdp.bad_anchor_ori,
+    #     params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "motion", "threshold": 0.8},
+    # )
+    # ee_body_pos = DoneTerm(
+    #     func=mdp.bad_motion_body_pos_z_only,
+    #     params={
+    #         "command_name": "motion",
+    #         "threshold": 0.25,
+    #         "body_names": [
+    #             "left_ankle_roll_link",
+    #             "right_ankle_roll_link",
+    #             "left_elbow_yaw_link",
+    #             "right_elbow_yaw_link",
+    #         ],
+    #     },
+    # )
+    base_contact = DoneTerm(
+        func=mdp.illegal_contact,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="base_link"), "threshold": 1.0},
     )
-    anchor_ori = DoneTerm(
-        func=mdp.bad_anchor_ori,
-        params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "motion", "threshold": 0.8},
-    )
-    ee_body_pos = DoneTerm(
-        func=mdp.bad_motion_body_pos_z_only,
-        params={
-            "command_name": "motion",
-            "threshold": 0.25,
-            "body_names": [
-                "left_ankle_roll_link",
-                "right_ankle_roll_link",
-                "left_wrist_yaw_link",
-                "right_wrist_yaw_link",
-            ],
-        },
-    )
-
+    base_height = DoneTerm(func=mdp.root_height_below_minimum, params={"minimum_height": 0.2})
 
 @configclass
 class CurriculumCfg:

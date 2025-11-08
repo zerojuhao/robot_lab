@@ -28,13 +28,14 @@ from isaaclab.utils.math import (
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
-
+import isaaclab.utils.string as string_utils
 
 class MotionLoader:
     def __init__(self, motion_file: str, body_indexes: Sequence[int], device: str = "cpu"):
         assert os.path.isfile(motion_file), f"Invalid file path: {motion_file}"
         data = np.load(motion_file)
         self.fps = data["fps"]
+        self.joint_names = data["joint_names"]
         self.joint_pos = torch.tensor(data["joint_pos"], dtype=torch.float32, device=device)
         self.joint_vel = torch.tensor(data["joint_vel"], dtype=torch.float32, device=device)
         self._body_pos_w = torch.tensor(data["body_pos_w"], dtype=torch.float32, device=device)
@@ -75,6 +76,24 @@ class MotionCommand(CommandTerm):
         )
 
         self.motion = MotionLoader(self.cfg.motion_file, self.body_indexes, device=self.device)
+
+        # start retargeting
+        # retarget joint order
+        print("self.motion.joint_pos before retargeting:", self.motion.joint_pos)
+        print("shape before retargeting:", self.motion.joint_pos.shape)
+        retargeted_joint_names = self.motion.joint_names
+        lab_joint_names = self.robot.data.joint_names
+        retargeted_to_lab_mapping, _ = string_utils.resolve_matching_names(
+            keys=lab_joint_names,
+            list_of_strings=retargeted_joint_names,
+            preserve_order=True
+        )
+        self.motion.joint_pos = self.motion.joint_pos[:, retargeted_to_lab_mapping]
+        self.motion.joint_vel = self.motion.joint_vel[:, retargeted_to_lab_mapping]
+        # end retargeting
+        print("self.motion.joint_pos after retargeting:", self.motion.joint_pos)
+        print("shape after retargeting:", self.motion.joint_pos.shape)
+
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         self.body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
         self.body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)

@@ -18,7 +18,7 @@ from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Replay motion from csv file and output to npz file.")
-parser.add_argument("--input_file", "-f", type=str, required=True, help="The path to the input motion csv file.")
+parser.add_argument("--input_file", "-f", type=str, default='source/robot_lab/robot_lab/tasks/manager_based/beyondmimic/config/g1/motion/G1_gangnam_style_V01.bvh_60hz.csv', help="The path to the input motion csv file.")
 parser.add_argument("--input_fps", type=int, default=60, help="The fps of the input motion.")
 parser.add_argument(
     "--frame_range",
@@ -30,8 +30,8 @@ parser.add_argument(
         " loaded."
     ),
 )
-parser.add_argument("--output_name", type=str, help="The name of the motion npz file.")
-parser.add_argument("--output_fps", type=int, default=50, help="The fps of the output motion.")
+parser.add_argument("--output_name", type=str, default="source/robot_lab/robot_lab/tasks/manager_based/beyondmimic/config/g1/motion/out.npz", help="The name of the motion npz file.")
+parser.add_argument("--output_fps", type=int, default=60, help="The fps of the output motion.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
